@@ -685,6 +685,13 @@ class RegressionModel(GlobalForecastingModel):
         Function that fit the model. Deriving classes can override this method for adding additional
         parameters (e.g., adding validation data), keeping the sanity checks on series performed by fit().
         """
+
+        feature_importance_config = kwargs.pop('feature_importance_config', {})
+        if feature_importance_config is None:
+            feature_importance_config = {}
+        training_samples_file_name = feature_importance_config.get('training_samples_file_name', None)
+        features_file_name = feature_importance_config.get('features_file_name', None)
+
         training_samples, training_labels, sample_weights = self._create_lagged_data(
             series=series,
             past_covariates=past_covariates,
@@ -693,8 +700,6 @@ class RegressionModel(GlobalForecastingModel):
             sample_weight=sample_weight,
             last_static_covariates_shape=None,
         )
-
-        np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/training_samples.npy', training_samples)
 
         if self.supports_val_set and val_series is not None:
             kwargs = self._add_val_set_to_kwargs(
@@ -734,7 +739,10 @@ class RegressionModel(GlobalForecastingModel):
                 use_static_covariates=self.uses_static_covariates,
             )
         )
-        np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/feature_names.npy', self._lagged_feature_names)
+
+        if feature_importance_config:
+            np.save(training_samples_file_name, training_samples)
+            np.save(features_file_name, self._lagged_feature_names)
 
 
     def fit(
@@ -970,7 +978,8 @@ class RegressionModel(GlobalForecastingModel):
         verbose: bool = False,
         predict_likelihood_parameters: bool = False,
         show_warnings: bool = True,
-        lag_data: Optional[Union[TimeSeries, Sequence[TimeSeries]]] = None,
+        precomputed_lags: Optional[Union[TimeSeries, Sequence[TimeSeries]]] = None,
+        prediction_lag_path: Optional[str] = None,
         **kwargs,
     ) -> Union[TimeSeries, Sequence[TimeSeries]]:
         """Forecasts values for `n` time steps after the end of the series.
@@ -1161,11 +1170,9 @@ class RegressionModel(GlobalForecastingModel):
                 series_matrix = np.concatenate([series_matrix, predictions[-1]], axis=1)
 
             # extract and concatenate lags from target and covariates series
-            if lag_data is not None:
-                logger.warning("Using Precomputed Lag data...")
-                X = lag_data
+            if precomputed_lags is not None:
+                X = precomputed_lags
             else:
-                logger.warning("Calculating Dynamic Lag data...")
                 X = _create_lagged_data_autoregression(
                 target_series=series,
                 t_pred=t_pred,
@@ -1180,8 +1187,9 @@ class RegressionModel(GlobalForecastingModel):
                 uses_static_covariates=self.uses_static_covariates,
                 last_static_covariates_shape=self._static_covariates_shape,
             )
-
-            np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/X.npy', X)
+    
+            if prediction_lag_path is not None and t_pred == 0:
+                np.save(prediction_lag_path, X)
 
             # X has shape (n_series * n_samples, n_regression_features)
             prediction = self._predict_and_sample(
