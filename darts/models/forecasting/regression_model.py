@@ -694,6 +694,8 @@ class RegressionModel(GlobalForecastingModel):
             last_static_covariates_shape=None,
         )
 
+        np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/training_samples.npy', training_samples)
+
         if self.supports_val_set and val_series is not None:
             kwargs = self._add_val_set_to_kwargs(
                 kwargs=kwargs,
@@ -732,6 +734,8 @@ class RegressionModel(GlobalForecastingModel):
                 use_static_covariates=self.uses_static_covariates,
             )
         )
+        np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/feature_names.npy', self._lagged_feature_names)
+
 
     def fit(
         self,
@@ -966,6 +970,7 @@ class RegressionModel(GlobalForecastingModel):
         verbose: bool = False,
         predict_likelihood_parameters: bool = False,
         show_warnings: bool = True,
+        lag_data: Optional[Union[TimeSeries, Sequence[TimeSeries]]] = None,
         **kwargs,
     ) -> Union[TimeSeries, Sequence[TimeSeries]]:
         """Forecasts values for `n` time steps after the end of the series.
@@ -1156,7 +1161,12 @@ class RegressionModel(GlobalForecastingModel):
                 series_matrix = np.concatenate([series_matrix, predictions[-1]], axis=1)
 
             # extract and concatenate lags from target and covariates series
-            X = _create_lagged_data_autoregression(
+            if lag_data is not None:
+                logger.warning("Using Precomputed Lag data...")
+                X = lag_data
+            else:
+                logger.warning("Calculating Dynamic Lag data...")
+                X = _create_lagged_data_autoregression(
                 target_series=series,
                 t_pred=t_pred,
                 shift=shift,
@@ -1170,6 +1180,8 @@ class RegressionModel(GlobalForecastingModel):
                 uses_static_covariates=self.uses_static_covariates,
                 last_static_covariates_shape=self._static_covariates_shape,
             )
+
+            np.save('/Users/pramodhgps/Documents/SwayRepos/offline_code/feature_importance/X.npy', X)
 
             # X has shape (n_series * n_samples, n_regression_features)
             prediction = self._predict_and_sample(
