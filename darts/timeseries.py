@@ -76,7 +76,6 @@ STATIC_COV_TAG = "static_covariates"
 DEFAULT_GLOBAL_STATIC_COV_NAME = "global_components"
 HIERARCHY_TAG = "hierarchy"
 
-logger.warning("Running forked version of darts...")
 
 
 class TimeSeries:
